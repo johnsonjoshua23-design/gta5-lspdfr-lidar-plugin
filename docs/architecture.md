@@ -1,82 +1,83 @@
-# Architecture guide
+# LSPDFR GTA 5 LiDAR Plugin
 
-This project is intended to model a clean architecture for a GTA 5 / LSPDFR LiDAR plugin.
+This repository is a learning-focused starter project for building a LiDAR-style plugin for LSPDFR in GTA 5.
 
-## Core idea
+The goal of this project is to help you learn the full process of:
+- setting up a plugin project
+- organizing game-mod code cleanly
+- designing a LiDAR/scan system
+- building the logic for ray-based detection
+- rendering scan data in-game
+- tuning runtime configuration
 
-A LiDAR-like mod is not just a single script. It is made from several responsibilities:
+Important: this repo is structured as a clean foundation for learning and experimentation. It does not include the GTA 5 game files or LSPDFR package references, since those are external dependencies from the game/modding ecosystem.
 
-1. Plugin bootstrap
-   - starts when the game/mod loads
-   - registers keybinds, commands, and lifecycle handlers
+## Project structure
 
-2. Scanner logic
-   - defines the scan origin
-   - computes sweep angles
-   - calculates vectors
-   - tests for object hits
+- `src/LspdfrLidarPlugin/` - main C# project skeleton
+- `docs/` - setup and architecture guides
+- `README.md` - project overview and roadmap
 
-3. Data models
-   - scan settings
-   - hit results
-   - detected targets
+## Learning roadmap
 
-4. UI rendering
-   - draw lines, markers, labels, and HUD data
+### Step 1: project foundation
+We are here. This step gives you:
+- repo layout
+- plugin lifecycle concept
+- scanner data models
+- baseline classes for future game integration
 
-5. Runtime configuration
-   - allow the user to tune range, angle, color, and key bindings
+### Step 2: scanner logic (current step)
+We are building:
+- beam directions
+- scan angle sweep calculation
+- hit detection against sample world obstacles
+- approximate LiDAR-style beams that return measured distances
 
-## Recommended class layout
+### Step 3: gameplay integration
+We will connect the scanner to:
+- players and vehicles
+- nearby entities
+- target filtering
+- LSPDFR-relevant use cases
 
-```text
-src/
-  LspdfrLidarPlugin/
-    Bootstrap/
-      LidarPluginBootstrap.cs
-    Scanner/
-      LidarScanner.cs
-    Models/
-      ScanSettings.cs
-      ScanHit.cs
-      ScanTarget.cs
-    UI/
-      LidarHudRenderer.cs
-    Config/
-      PluginConfig.cs
-    Commands/
-      LidarCommands.cs
-```
+### Step 4: UI rendering
+We will add:
+- HUD overlays
+- debug scan lines
+- hit markers
+- target labels
 
-## Important design principle
+### Step 5: configuration and polish
+We will finish with:
+- config files
+- commands
+- toggles
+- debugging helpers
 
-Keep game integration separate from the scanner logic.
+## Quick start
 
-The scanner should operate on generic math primitives and data structures. The game layer should convert from GTA entities to plugin-friendly data. This separation makes the project easier to learn and debug.
+1. Install the .NET SDK.
+2. Open the project in your IDE.
+3. Build it to confirm the project skeleton compiles.
+4. Start with the `LidarScanner` and `LidarPluginBootstrap` classes.
+5. Follow the docs for the next steps.
 
-## Minimal lifecycle
+## Example scan simulation
 
-```text
-Initialize()
-  -> register commands
-  -> load config
-  -> create scanner instance
+The scanner can now take a sample list of world obstacle positions and run a simplified LiDAR scan.
 
-Update()
-  -> read player/vehicle state
-  -> run scan if enabled
-  -> evaluate target data
-  -> render UI
+This is how the logic works:
+- for each beam angle in the scanner cone
+- compute a direction vector
+- iterate nearby obstacles
+- if the obstacle appears in the current beam direction
+- record the distance and hit point
 
-Shutdown()
-  -> clear handlers
-  -> dispose resources
-```
+This is the same concept used in a real LiDAR or raycast system, just simplified for learning.
 
-## Step 1 outcome
+## Next milestone
 
-At the end of this step, you should understand:
-- the purpose of each project folder
-- the lifecycle of a plugin
-- the scanner data model
-- how to keep the code modular and readable
+The next step is to connect this scanner logic to entity-aware gameplay and add a user-facing visual layer.
+
+This repo is designed to grow with you as you learn.

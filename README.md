@@ -1,71 +1,136 @@
-# LSPDFR GTA 5 LiDAR Plugin
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
 
-This repository is a learning-focused starter project for building a LiDAR-style plugin for LSPDFR in GTA 5.
+namespace LspdfrLidarPlugin;
 
-The goal of this project is to help you learn the full process of:
-- setting up a plugin project
-- organizing game-mod code cleanly
-- designing a LiDAR/scan system
-- building the logic for ray-based detection
-- rendering scan data in-game
-- tuning runtime configuration
+public sealed class ScanSettings
+{
+    public float Range { get; set; } = 80f;
+    public float ScanAngle { get; set; } = 120f;
+    public float Resolution { get; set; } = 2f;
+    public float OriginHeightOffset { get; set; } = 1.2f;
+    public int MaxHits { get; set; } = 256;
+    public bool DrawDebugLines { get; set; } = true;
+}
 
-Important: this repository is intentionally structured as a clean foundation for learning and experimentation. It does not include the GTA 5 game files or LSPDFR package references, since those are external dependencies from the game/modding ecosystem.
+public sealed class ScanHit
+{
+    public float AngleDegrees { get; set; }
+    public float Distance { get; set; }
+    public bool IsHit { get; set; }
+    public Vector3 Origin { get; set; }
+    public Vector3 HitPoint { get; set; }
+}
 
-## Project structure
+public sealed class ScanTarget
+{
+    public string Label { get; set; } = string.Empty;
+    public float Distance { get; set; }
+    public Vector3 Position { get; set; }
+    public bool IsVehicle { get; set; }
+    public bool IsPedestrian { get; set; }
+}
 
-- `src/LspdfrLidarPlugin/` - main C# project skeleton
-- `docs/` - setup and architecture guides
-- `README.md` - project overview and roadmap
+public sealed class LidarScanner
+{
+    private readonly ScanSettings _settings;
 
-## Learning roadmap
+    public LidarScanner(ScanSettings settings)
+    {
+        _settings = settings;
+    }
 
-### Step 1: project foundation
-We are here. This step gives you:
-- repo layout
-- plugin lifecycle concept
-- scanner data models
-- baseline classes for future game integration
+    public IReadOnlyList<ScanHit> Scan(
+        float originX,
+        float originY,
+        float originZ,
+        float headingDegrees,
+        IEnumerable<Vector3>? obstacles = null)
+    {
+        var hits = new List<ScanHit>();
+        var origin = new Vector3(originX, originY + _settings.OriginHeightOffset, originZ);
+        var beamDirections = BuildBeamDirections(headingDegrees);
+        var worldObstacles = obstacles?.ToList() ?? new List<Vector3>();
 
-### Step 2: scanner logic
-We will build:
-- scan angles
-- ray directions
-- distance measurement
-- hit detection
-- world origin handling
+        foreach (var beam in beamDirections)
+        {
+            var beamDirection = beam.Direction;
+            var beamEnd = origin + beamDirection * _settings.Range;
+            var closestDistance = _settings.Range;
+            var closestHit = beamEnd;
+            var hasHit = false;
 
-### Step 3: gameplay integration
-We will connect the scanner to:
-- players and vehicles
-- nearby entities
-- target filtering
-- LSPDFR-relevant use cases
+            foreach (var obstacle in worldObstacles)
+            {
+                var toObstacle = obstacle - origin;
+                var obstacleDistance = toObstacle.Length();
 
-### Step 4: UI rendering
-We will add:
-- HUD overlays
-- debug scan lines
-- hit markers
-- target labels
+                if (obstacleDistance <= 0f || obstacleDistance > _settings.Range)
+                {
+                    continue;
+                }
 
-### Step 5: configuration and polish
-We will finish with:
-- config files
-- commands
-- toggles
-- debugging helpers
+                var normalizedObstacle = toObstacle / obstacleDistance;
+                var normalizedBeam = Vector3.Normalize(beamDirection);
+                var alignment = Vector3.Dot(normalizedObstacle, normalizedBeam);
 
-## Quick start
+                if (alignment <= 0f)
+                {
+                    continue;
+                }
 
-1. Install the .NET SDK.
-2. Open the project in your IDE.
-3. Build it to confirm the project skeleton compiles.
-4. Start with the `LidarScanner` and `LidarPluginBootstrap` classes.
-5. Follow the docs for the next steps.
+                var angleDifference = MathAcos(Math.Clamp(alignment, -1f, 1f)) * 180f / MathF.PI;
+                if (angleDifference > _settings.Resolution * 1.5f)
+                {
+                    continue;
+                }
 
-## Next milestone
+                if (obstacleDistance < closestDistance)
+                {
+                    closestDistance = obstacleDistance;
+                    closestHit = obstacle;
+                    hasHit = true;
+                }
+            }
 
-The next step is to expand the scanner logic and add real ray-based detection logic, not just the project foundation.
+            hits.Add(new ScanHit
+            {
+                AngleDegrees = beam.Angle,
+                Distance = hasHit ? closestDistance : _settings.Range,
+                IsHit = hasHit,
+                Origin = origin,
+                HitPoint = hasHit ? closestHit : beamEnd
+            });
+        }
 
-This repo is designed to grow with you as you learn.
+        return hits;
+    }
+
+    private IEnumerable<(float Angle, Vector3 Direction)> BuildBeamDirections(float headingDegrees)
+    {
+        var halfAngle = _settings.ScanAngle / 2f;
+
+        for (var angle = -halfAngle; angle <= halfAngle; angle += _settings.Resolution)
+        {
+            yield return (angle, GetDirectionVector(headingDegrees + angle));
+        }
+    }
+
+    private static Vector3 GetDirectionVector(float headingDegrees)
+    {
+        var radians = MathF.PI * headingDegrees / 180f;
+
+        var x = MathF.Cos(radians);
+        var y = 0f;
+        var z = MathF.Sin(radians);
+
+        return new Vector3(x, y, z);
+    }
+
+    private static float MathAcos(float value)
+    {
+        return MathF.Acos(value);
+    }
+}
