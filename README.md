@@ -1,136 +1,103 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
+# LSPDFR GTA 5 LiDAR Plugin
 
-namespace LspdfrLidarPlugin;
+This repo is now being structured as a real GTA 5 mod project using RagePluginHook (RPH) and the LSPDFR API.
 
-public sealed class ScanSettings
-{
-    public float Range { get; set; } = 80f;
-    public float ScanAngle { get; set; } = 120f;
-    public float Resolution { get; set; } = 2f;
-    public float OriginHeightOffset { get; set; } = 1.2f;
-    public int MaxHits { get; set; } = 256;
-    public bool DrawDebugLines { get; set; } = true;
-}
+The goal is to learn the real plugin development process step-by-step:
+- create a plugin project for GTA V
+- integrate with RagePluginHook
+- structure the code cleanly for a LSPDFR script
+- add a LiDAR-style scanner system
+- render debug scan data in-game
+- later add gameplay logic and police-specific behavior
 
-public sealed class ScanHit
-{
-    public float AngleDegrees { get; set; }
-    public float Distance { get; set; }
-    public bool IsHit { get; set; }
-    public Vector3 Origin { get; set; }
-    public Vector3 HitPoint { get; set; }
-}
+## What this project is
 
-public sealed class ScanTarget
-{
-    public string Label { get; set; } = string.Empty;
-    public float Distance { get; set; }
-    public Vector3 Position { get; set; }
-    public bool IsVehicle { get; set; }
-    public bool IsPedestrian { get; set; }
-}
+This repo is intended to be a learning-first RagePluginHook project for GTA 5 / LSPDFR. It is not a complete game mod yet, because the GTA 5 and LSPDFR assemblies are external dependencies installed on your machine.
 
-public sealed class LidarScanner
-{
-    private readonly ScanSettings _settings;
+## Required dependencies
 
-    public LidarScanner(ScanSettings settings)
-    {
-        _settings = settings;
-    }
+You need the following on your development machine:
+- GTA 5 installed
+- RagePluginHook (RPH)
+- LSPDFR installed and referenced by your project
+- Visual Studio 2022 or VS Code with C# support
 
-    public IReadOnlyList<ScanHit> Scan(
-        float originX,
-        float originY,
-        float originZ,
-        float headingDegrees,
-        IEnumerable<Vector3>? obstacles = null)
-    {
-        var hits = new List<ScanHit>();
-        var origin = new Vector3(originX, originY + _settings.OriginHeightOffset, originZ);
-        var beamDirections = BuildBeamDirections(headingDegrees);
-        var worldObstacles = obstacles?.ToList() ?? new List<Vector3>();
+## Repository structure
 
-        foreach (var beam in beamDirections)
-        {
-            var beamDirection = beam.Direction;
-            var beamEnd = origin + beamDirection * _settings.Range;
-            var closestDistance = _settings.Range;
-            var closestHit = beamEnd;
-            var hasHit = false;
+```text
+src/
+  LspdfrLidarPlugin/
+    Bootstrapping/
+      LidarPlugin.cs
+    Scanner/
+      LidarScanner.cs
+    Models/
+      ScanSettings.cs
+      ScanHit.cs
+      ScanTarget.cs
+    UI/
+      LidarHudRenderer.cs
+    Utils/
+      MathUtility.cs
+```
 
-            foreach (var obstacle in worldObstacles)
-            {
-                var toObstacle = obstacle - origin;
-                var obstacleDistance = toObstacle.Length();
+## Quick setup
 
-                if (obstacleDistance <= 0f || obstacleDistance > _settings.Range)
-                {
-                    continue;
-                }
+1. Install RagePluginHook and LSPDFR in your GTA 5 modding setup.
+2. Set these environment variables before building:
+   - `RAGEPLUGINHOOK_PATH`
+   - `LSPDFR_PATH`
+3. Restore NuGet packages (if any are added later).
+4. Build the plugin project.
+5. Copy the output DLL into your RagePluginHook `plugins` directory.
 
-                var normalizedObstacle = toObstacle / obstacleDistance;
-                var normalizedBeam = Vector3.Normalize(beamDirection);
-                var alignment = Vector3.Dot(normalizedObstacle, normalizedBeam);
+## Example environment variable setup
 
-                if (alignment <= 0f)
-                {
-                    continue;
-                }
+On Windows, in PowerShell:
 
-                var angleDifference = MathAcos(Math.Clamp(alignment, -1f, 1f)) * 180f / MathF.PI;
-                if (angleDifference > _settings.Resolution * 1.5f)
-                {
-                    continue;
-                }
+```powershell
+$env:RAGEPLUGINHOOK_PATH = "C:\Games\GTA5\RagePluginHook"
+$env:LSPDFR_PATH = "C:\Games\GTA5\LSPDFR"
+```
 
-                if (obstacleDistance < closestDistance)
-                {
-                    closestDistance = obstacleDistance;
-                    closestHit = obstacle;
-                    hasHit = true;
-                }
-            }
+Then build:
 
-            hits.Add(new ScanHit
-            {
-                AngleDegrees = beam.Angle,
-                Distance = hasHit ? closestDistance : _settings.Range,
-                IsHit = hasHit,
-                Origin = origin,
-                HitPoint = hasHit ? closestHit : beamEnd
-            });
-        }
+```powershell
+dotnet build src/LspdfrLidarPlugin/LspdfrLidarPlugin.csproj
+```
 
-        return hits;
-    }
+## Important learning note
 
-    private IEnumerable<(float Angle, Vector3 Direction)> BuildBeamDirections(float headingDegrees)
-    {
-        var halfAngle = _settings.ScanAngle / 2f;
+This repo is intentionally modular. We are building the real architecture, not a single monolithic script. That is how serious GTA mods are organized.
 
-        for (var angle = -halfAngle; angle <= halfAngle; angle += _settings.Resolution)
-        {
-            yield return (angle, GetDirectionVector(headingDegrees + angle));
-        }
-    }
+## Project phases
 
-    private static Vector3 GetDirectionVector(float headingDegrees)
-    {
-        var radians = MathF.PI * headingDegrees / 180f;
+### Phase 1 - plugin bootstrap
+- create a RagePluginHook entry point
+- initialize scanner state
+- start the main plugin loop
 
-        var x = MathF.Cos(radians);
-        var y = 0f;
-        var z = MathF.Sin(radians);
+### Phase 2 - scanner logic
+- compute beam directions from heading and angle
+- detect targets within range
+- return distances and hit points
 
-        return new Vector3(x, y, z);
-    }
+### Phase 3 - UI and diagnostics
+- draw debug scan lines
+- display nearest target details
+- visualize scanner cone in the game world
 
-    private static float MathAcos(float value)
-    {
-        return MathF.Acos(value);
-    }
-}
+### Phase 4 - GTA entity integration
+- connect to nearby peds and vehicles
+- filter by distance and type
+- add police-style scan behavior
+
+### Phase 5 - polish
+- config files
+- toggle keys
+- better target labels
+- performance tuning
+
+## Next step
+
+We will now move from the math-only model into a real RagePluginHook plugin structure that follows the actual GTA mod workflow.
