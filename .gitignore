@@ -1,0 +1,35 @@
+# .gitignore
+
+## Build outputs
+[Oo]ut/
+[Bb]in/
+[Dd]ebug/
+[Rr]elease/
+obj/
+
+## Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
+
+## Packages
+packages/
+*.nupkg
+
+## ReSharper
+_ReSharper*/
+
+## Coverage
+coverage/
+*.coverage
+*.coveragexml
